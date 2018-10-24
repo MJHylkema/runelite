@@ -24,6 +24,7 @@
  */
 package net.runelite.client.ui;
 
+import com.google.common.base.Strings;
 import com.google.common.eventbus.Subscribe;
 import java.applet.Applet;
 import java.awt.Canvas;
@@ -37,9 +38,12 @@ import java.awt.GraphicsConfiguration;
 import java.awt.LayoutManager;
 import java.awt.Rectangle;
 import java.awt.TrayIcon;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -56,18 +60,23 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
 import net.runelite.api.GameState;
+import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.events.ConfigChanged;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.RuneLite;
 import net.runelite.client.RuneLiteProperties;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.ExpandResizeType;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.config.RuneLiteConfig;
 import net.runelite.client.config.WarningOnExit;
 import net.runelite.client.events.NavigationButtonAdded;
 import net.runelite.client.events.NavigationButtonRemoved;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.ui.skin.SubstanceRuneLiteLookAndFeel;
+import net.runelite.client.util.HotkeyListener;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.OSType;
 import net.runelite.client.util.OSXUtil;
@@ -107,6 +116,7 @@ public class ClientUI
 	private final KeyManager keyManager;
 	private final Applet client;
 	private final ConfigManager configManager;
+	private final Provider<ClientThread> clientThreadProvider;
 	private final CardLayout cardLayout = new CardLayout();
 	private ContainableFrame frame;
 	private JPanel navContainer;
@@ -127,13 +137,15 @@ public class ClientUI
 		RuneLiteConfig config,
 		KeyManager keyManager,
 		@Nullable Applet client,
-		ConfigManager configManager)
+		ConfigManager configManager,
+		Provider<ClientThread> clientThreadProvider)
 	{
 		this.properties = properties;
 		this.config = config;
 		this.keyManager = keyManager;
 		this.client = client;
 		this.configManager = configManager;
+		this.clientThreadProvider = clientThreadProvider;
 	}
 
 	@Subscribe
@@ -231,6 +243,44 @@ public class ClientUI
 		});
 	}
 
+	@Subscribe
+	public void onGameStateChanged(final GameStateChanged event)
+	{
+		if (event.getGameState() != GameState.LOGGED_IN || !(client instanceof Client) || !config.usernameInTitle())
+		{
+			return;
+		}
+
+		final Client client = (Client)this.client;
+		final ClientThread clientThread = clientThreadProvider.get();
+
+		// Keep scheduling event until we get our name
+		clientThread.invokeLater(() ->
+		{
+			if (client.getGameState() != GameState.LOGGED_IN)
+			{
+				return true;
+			}
+
+			final Player player = client.getLocalPlayer();
+
+			if (player == null)
+			{
+				return false;
+			}
+
+			final String name = player.getName();
+
+			if (Strings.isNullOrEmpty(name))
+			{
+				return false;
+			}
+
+			frame.setTitle(properties.getTitle() + " - " + name);
+			return true;
+		});
+	}
+
 	/**
 	 * Initialize UI.
 	 *
@@ -290,9 +340,17 @@ public class ClientUI
 			frame.add(container);
 
 			// Add key listener
-			final UiKeyListener uiKeyListener = new UiKeyListener(this);
-			frame.addKeyListener(uiKeyListener);
-			keyManager.registerKeyListener(uiKeyListener);
+			final HotkeyListener sidebarListener = new HotkeyListener(() ->
+				new Keybind(KeyEvent.VK_F11, InputEvent.CTRL_DOWN_MASK))
+			{
+				@Override
+				public void hotkeyPressed()
+				{
+					toggleSidebar();
+				}
+			};
+
+			keyManager.registerKeyListener(sidebarListener);
 
 			// Decorate window with custom chrome and titlebar if needed
 			final boolean withTitleBar = config.enableCustomChrome();
@@ -666,6 +724,20 @@ public class ClientUI
 		if (frame == null)
 		{
 			return;
+		}
+
+		if (config.usernameInTitle() && (client instanceof Client))
+		{
+			final Player player = ((Client)client).getLocalPlayer();
+
+			if (player != null && player.getName() != null)
+			{
+				frame.setTitle(properties.getTitle() + " - " + player.getName());
+			}
+		}
+		else
+		{
+			frame.setTitle(properties.getTitle());
 		}
 
 		if (frame.isAlwaysOnTopSupported())

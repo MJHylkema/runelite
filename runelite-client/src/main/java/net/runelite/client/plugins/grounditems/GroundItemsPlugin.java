@@ -45,7 +45,6 @@ import javax.inject.Inject;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
@@ -55,6 +54,7 @@ import net.runelite.api.ItemLayer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Node;
+import net.runelite.api.Player;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
 import net.runelite.api.events.ConfigChanged;
@@ -64,6 +64,7 @@ import net.runelite.api.events.ItemDespawned;
 import net.runelite.api.events.ItemQuantityChanged;
 import net.runelite.api.events.ItemSpawned;
 import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.client.Notifier;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.input.KeyManager;
@@ -77,14 +78,13 @@ import static net.runelite.client.plugins.grounditems.config.MenuHighlightMode.N
 import static net.runelite.client.plugins.grounditems.config.MenuHighlightMode.OPTION;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ColorUtil;
-import net.runelite.http.api.item.ItemPrice;
+import net.runelite.client.util.StackFormatter;
 
 @PluginDescriptor(
 	name = "Ground Items",
 	description = "Highlight ground items and/or show price information",
 	tags = {"grand", "exchange", "high", "alchemy", "prices", "highlight", "overlay"}
 )
-@Slf4j
 public class GroundItemsPlugin extends Plugin
 {
 	private static final Splitter COMMA_SPLITTER = Splitter
@@ -140,6 +140,9 @@ public class GroundItemsPlugin extends Plugin
 
 	@Inject
 	private GroundItemsOverlay overlay;
+
+	@Inject
+	private Notifier notifier;
 
 	@Getter
 	private final Map<GroundItem.GroundItemKey, GroundItem> collectedGroundItems = new LinkedHashMap<>();
@@ -208,6 +211,13 @@ public class GroundItemsPlugin extends Plugin
 		if (existing != null)
 		{
 			existing.setQuantity(existing.getQuantity() + groundItem.getQuantity());
+		}
+
+		boolean isHighlighted = config.highlightedColor().equals(getHighlighted(groundItem.getName(),
+				groundItem.getGePrice(), groundItem.getHaPrice()));
+		if (config.notifyHighlightedDrops() && isHighlighted)
+		{
+			notifyHighlightedItem(groundItem);
 		}
 	}
 
@@ -279,11 +289,7 @@ public class GroundItemsPlugin extends Plugin
 		}
 		else
 		{
-			final ItemPrice itemPrice = itemManager.getItemPrice(realItemId);
-			if (itemPrice != null)
-			{
-				groundItem.setGePrice(itemPrice.getPrice());
-			}
+			groundItem.setGePrice(itemManager.getItemPrice(realItemId));
 		}
 
 		return groundItem;
@@ -371,8 +377,8 @@ public class GroundItemsPlugin extends Plugin
 
 			final ItemComposition itemComposition = itemManager.getItemComposition(itemId);
 			final int realItemId = itemComposition.getNote() != -1 ? itemComposition.getLinkedNoteId() : itemComposition.getId();
-			final ItemPrice itemPrice = itemManager.getItemPrice(realItemId);
-			final int price = itemPrice == null ? itemComposition.getPrice() : itemPrice.getPrice();
+			final int itemPrice = itemManager.getItemPrice(realItemId);
+			final int price = itemPrice <= 0 ? itemComposition.getPrice() : itemPrice;
 			final int haPrice = Math.round(itemComposition.getPrice() * HIGH_ALCHEMY_CONSTANT) * quantity;
 			final int gePrice = quantity * price;
 			final Color hidden = getHidden(itemComposition.getName(), gePrice, haPrice, itemComposition.isTradeable());
@@ -490,5 +496,35 @@ public class GroundItemsPlugin extends Plugin
 		{
 			setHotKeyPressed(false);
 		}
+	}
+
+	private void notifyHighlightedItem(GroundItem item)
+	{
+		final Player local = client.getLocalPlayer();
+		final StringBuilder notificationStringBuilder = new StringBuilder()
+			.append("[")
+			.append(local.getName())
+			.append("] received a highlighted drop: ")
+			.append(item.getName());
+
+		if (item.getQuantity() > 1)
+		{
+			notificationStringBuilder.append(" x ").append(item.getQuantity());
+
+
+			if (item.getQuantity() > (int) Character.MAX_VALUE)
+			{
+				notificationStringBuilder.append(" (Lots!)");
+			}
+			else
+			{
+				notificationStringBuilder.append(" (")
+					.append(StackFormatter.quantityToStackSize(item.getQuantity()))
+					.append(")");
+			}
+		}
+
+		notificationStringBuilder.append("!");
+		notifier.notify(notificationStringBuilder.toString());
 	}
 }

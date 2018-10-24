@@ -45,7 +45,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.HyperlinkEvent;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.events.SessionClose;
 import net.runelite.api.events.SessionOpen;
@@ -56,9 +55,7 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
-import net.runelite.client.util.RunnableExceptionLogger;
 
-@Slf4j
 @Singleton
 public class InfoPanel extends PluginPanel
 {
@@ -141,7 +138,7 @@ public class InfoPanel extends PluginPanel
 			{
 				if (e.getURL().toString().equals(RUNELITE_LOGIN))
 				{
-					executor.execute(RunnableExceptionLogger.wrap(sessionManager::login));
+					executor.execute(sessionManager::login);
 				}
 			}
 		});

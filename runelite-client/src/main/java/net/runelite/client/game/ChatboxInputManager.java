@@ -30,14 +30,12 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.function.Consumer;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.client.callback.ClientThread;
 
 @Singleton
-@Slf4j
 public class ChatboxInputManager
 {
 	public static final int NO_LIMIT = Integer.MAX_VALUE;
@@ -100,7 +98,7 @@ public class ChatboxInputManager
 		}
 		this.open = false;
 		clientThread.invoke(() -> client.runScript(
-			ScriptID.CLOSE_CHATBOX_INPUT,
+			ScriptID.RESET_CHATBOX_INPUT,
 			1,
 			1
 		));

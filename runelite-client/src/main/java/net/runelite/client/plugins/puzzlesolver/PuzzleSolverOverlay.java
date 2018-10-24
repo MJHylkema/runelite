@@ -37,13 +37,14 @@ import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import static net.runelite.api.SpriteID.MINIMAP_DESTINATION_FLAG;
+import static net.runelite.client.plugins.puzzlesolver.solver.PuzzleSolver.BLANK_TILE_VALUE;
+import static net.runelite.client.plugins.puzzlesolver.solver.PuzzleSolver.DIMENSION;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.game.SpriteManager;
@@ -60,7 +61,6 @@ import net.runelite.client.ui.overlay.components.BackgroundComponent;
 import net.runelite.client.ui.overlay.components.TextComponent;
 import net.runelite.client.util.ImageUtil;
 
-@Slf4j
 public class PuzzleSolverOverlay extends Overlay
 {
 	private static final int INFO_BOX_WIDTH = 100;
@@ -70,9 +70,6 @@ public class PuzzleSolverOverlay extends Overlay
 
 	private static final int PUZZLE_TILE_SIZE = 39;
 	private static final int DOT_MARKER_SIZE = 16;
-
-	private static final int BLANK_TILE_VALUE = -1;
-	private static final int DIMENSION = 5;
 
 	private final Client client;
 	private final PuzzleSolverConfig config;
